@@ -1,0 +1,59 @@
+random_degrees(_seed) {
+	return max(10, fract(sin(_seed * 987)) * 300);
+	}
+	
+random_thickness (_seed) {
+	return max(fract(sin(_seed * 884)) * 0.3, 0.01);
+    }
+
+random_speed(_seed) {
+	return sin(_seed * 1023) * 10;
+	}
+	
+random_col(_seed) {
+	
+	rand_red = fract(sin(_seed * 849));
+	rand_green = fract(sin(_seed * 912));
+	rand_blue = fract(sin(_seed * 1001));
+
+col = vec(rand_red, rand_green, rand_blue, 1);
+
+	return col;
+}
+
+draw_arc(_uv, _time, _seed, _arc, _thickness, _rad, _speed) {
+	
+	x, y = cartopol(_uv.x, _uv.y);
+	y += radians(_time * _speed);
+	uvx, uvy = poltocar(x,y);
+	uv = vec (uvx, uvy);
+
+	len, ang = cartopol(uv.x, uv.y);
+	ang += pi;
+	ang /= twopi;
+	ang *= 360;
+	
+	final_bool = (step(len, _thickness + _rad) - step(len, _rad)) * (step (ang, _arc) * (floor(ang/4) % 2 == 0));
+	
+	arc_col = random_col(_seed);
+	
+	return final_bool ? arc_col : vec(0, 0, 0, 1);
+}
+
+Param time(0);
+
+//motion
+uv = ((cell * 2) - dim)/dim.y;//coordinates
+seed = floor(time/20);
+thickness = 0;
+final_col = vec(0, 0, 0, 1);
+
+for (rad = 0.02; rad < 0.8; rad += (thickness + 0.01)) {
+	arc_degrees = random_degrees(seed * rad);
+	thickness = random_thickness (seed * rad);
+	speed = random_speed(seed * rad);
+	final_col += draw_arc(uv, time, seed * rad, arc_degrees, thickness, rad, speed);
+	
+	}	
+
+out1 = clamp(final_col, 0, 1);
