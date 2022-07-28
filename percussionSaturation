@@ -1,0 +1,99 @@
+(
+SynthDef(\kick, {
+	var snd;
+	snd = SinOsc.ar(Env([400, 70, 50], [0.05, 0.2]).ar);
+	snd = snd + (Hasher.ar(Sweep.ar) * Env.linen(0.001, 0.001, 0.001).ar);
+	snd = snd * Env.perc(0.001, 1).ar(Done.freeSelf);
+	snd = Pan2.ar(snd, \pan.kr(0));
+	snd = snd * \amp.kr(-10.dbamp);
+	Out.ar(\out.kr(0), snd);
+}).add;
+
+SynthDef(\snare, {
+	var snd;
+	snd = SinOsc.ar(Env([800, 210, 200], [0.01, 0.2]).ar);
+	snd = snd + (BPF.ar(Hasher.ar(Sweep.ar), 2034, 0.3) * Env.perc(0.1, 0.3).ar * 13.dbamp);
+	snd = snd.tanh;
+	snd = snd * Env.perc(0.001, 0.3).ar(Done.freeSelf);
+	snd = Pan2.ar(snd, \pan.kr(0));
+	snd = snd * \amp.kr(-10.dbamp);
+	Out.ar(\out.kr(0), snd);
+}).add;
+
+SynthDef(\hat, {
+	var snd;
+	snd = BPF.ar(Hasher.ar(Sweep.ar), 9034, 0.1) * 13.dbamp;
+	snd = snd * Env.perc(0.02, 0.03).ar(Done.freeSelf);
+	snd = Pan2.ar(snd, \pan.kr(0));
+	snd = snd * \amp.kr(-10.dbamp);
+	Out.ar(\out.kr(0), snd);
+}).add;
+
+SynthDef(\clap, {
+	var snd;
+	snd = BPF.ar(Hasher.ar(Sweep.ar), 1134, 0.3) * 13.dbamp;
+	snd = snd * Env([0, 1, 0, 1, 0, 1, 0], [0.001, 0.01, 0.001, 0.01, 0.001, 0.08]).ar(Done.freeSelf);
+	snd = Pan2.ar(snd, \pan.kr(0));
+	snd = snd * \amp.kr(-10.dbamp);
+	Out.ar(\out.kr(0), snd);
+}).add;
+
+SynthDef(\fx, {
+	var snd, wet, bands, trig, sub;
+	snd = In.ar(\out.kr(0), 2);
+	wet = snd;
+	snd = wet + CombC.ar(snd, 0.01, SinOsc.ar(0.3).range(0.001, 0.01));
+	snd = wet + CombC.ar(snd, 0.05, SinOsc.ar(0.7).range(0.001, 0.05));
+	snd = wet + CombC.ar(snd, 0.04, SinOsc.ar(0.1).range(0.001, 0.04));
+	snd = snd + (wet * -5.dbamp * ToggleFF.ar(Dust.ar(8)).lag(0.03));
+	snd = snd + (NHHall.ar(snd * ToggleFF.ar(Dust.ar(8)).lag(0.03), 1));
+
+	bands = 30;
+	snd = BPF.ar([snd], (0..bands-1).linexp(0, bands-1, 80, 12e3),  0.1) * ({LFNoise2.kr(3)}!bands);
+	snd = snd.sum * 20.dbamp;
+
+	5.do{
+		snd = FreqShift.ar(snd, TRand.ar(-100, 100, Dust.ar(30)).lag(0.03));
+		snd = snd.blend(PitchShift.ar(snd, 0.2, TExpRand.ar(0.5, 2, Dust.ar(0.3)).lag(0.03)), TRand.ar(0, 1, Dust.ar(1)));
+	};
+
+	trig = Dust.ar(0.1);
+	snd = snd * (1 - Env.perc(0.03, 1, curve: 4).ar(Done.none, trig));
+	sub = SinOsc.ar([60, 61] * (Env.perc(0.0, 0.3).ar(Done.none, trig) * 100).midiratio) * Env.perc(0.03, 5).ar(Done.none, trig);
+	sub = sub + HPF.ar((sub * TExpRand.ar(1, 100, trig)).tanh, 300);
+	sub =  sub + CombC.ar(sub, 0.04, SinOsc.ar(0.1).range(0.005, 0.03), 0.3);
+	snd = snd + sub;
+	snd = BLowShelf.ar(snd, 300, 1, 10);
+
+
+	snd = Limiter.ar(snd);
+	ReplaceOut.ar(\out.kr(0), snd); //prepise
+}).add;
+
+)
+
+Synth(\kick)
+Synth(\snare)
+Synth(\hat)
+Synth(\clap)
+
+(
+Routine {
+	var bpm, beat;
+	bpm = 1000;
+	beat = 60 / bpm;
+
+	Synth.tail(nil, \fx);
+
+	loop {
+		var instrument, args, repeat;
+		instrument = [\kick, \snare, \clap, \hat].choose;
+		args = [pan: rrand(-0.8, 0.8)];
+		repeat = 1;
+		repeat.do {
+		Synth( instrument, args);
+			(beat/repeat).wait;
+			};
+	};
+}.play;
+)
